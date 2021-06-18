@@ -1,10 +1,12 @@
 var axios = require("axios");
 var path = require("path");
 var fs = require("fs");
-
+require("dotenv").config();
 var url = "https://api.assemblyai.com/v2";
 var token = process.env.ASSEMBLY_API_TOKEN;
 var file = "Stark_audio.mp3";
+
+console.log(token);
 
 let config = {
   headers: {
