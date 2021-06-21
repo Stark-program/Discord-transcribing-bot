@@ -4,16 +4,18 @@ const fs = require("fs");
 require("dotenv").config();
 const axios = require("axios");
 
+//Here is the API token logins you need to change to run this program. Create your own
+// Discord bot and replace the credentials with your own credentials and it should work
+
+client.login(process.env.DISCORD_LOGIN_TOKEN);
 var token = process.env.ASSEMBLY_API_TOKEN;
 let config = {
   headers: {
     authorization: token,
-    "Content-Type": "text/html",
+    "Content-Type": "application/json",
   },
 };
 let audio = {};
-
-client.login(process.env.DISCORD_LOGIN_TOKEN);
 
 client.on("ready", () => {
   console.log(`Logged in as ${client.user.tag}!`);
@@ -21,9 +23,7 @@ client.on("ready", () => {
 
 client.on("message", async (msg) => {
   if (msg.content === "!!tt help") {
-    msg.reply(
-      "```For local file include 'LF' in your command.  Example: !!tt LF \nFor public links, no additional command required.\n\nAdditional transcription requests:\nContent-Safety: CS\nTopic: T\nKey Phrases: KP\n\nCommand Structure: !!tt <LF(optional if its a local file)> <Additional transcription requests CS,T,KP (optional)> <Link to public URL audio or video file or local file path if local file>\n\nExample Commands:\nLocal File Transcribe: !!tt LF C:/file path\nPublic URL transcribe: !!tt https://Linktofile.com\nLocal file with additional requests: !!tt LF CS C:/pathtofile\nPublic URL with additional requests: !!tt CS T https://link```"
-    );
+    msg.reply("``````");
   }
   if (msg.content.includes("!!tt")) {
     var msgSplit = msg.content.split(" ");
@@ -72,31 +72,78 @@ client.on("message", async (msg) => {
                         )
                         .then((res) => {
                           var status_of_transcipt = res.data.status;
-                          console.log(status_of_transcipt);
+
                           if (
                             status_of_transcipt === "queued" ||
                             status_of_transcipt === "processing"
                           ) {
+                            msg.reply(
+                              `Your audio file is ${status_of_transcipt}`
+                            );
                             setTimeout(() => {
                               checkStatus();
-                            }, 3000);
+                            }, 5000);
                           }
-                          if (
-                            status_of_transcipt === "error" ||
-                            status_of_transcipt === "completed"
-                          ) {
-                            return console.log(
-                              "broke function",
 
-                              res.data.auto_highlights_result.results[0]
+                          // once the transcript has thrown an error
+
+                          if (status_of_transcipt === "error") {
+                            return msg.reply(
+                              `Your audio file gave an error of: ${res.error} `
                             );
                           }
+
+                          // if the transcription process has been completed
+
+                          if (status_of_transcipt === "completed") {
+                            msg.reply(
+                              `Your audio file is ${status_of_transcipt}`
+                            );
+
+                            // Responding to discord the transcription text of the audio file
+
+                            msg.reply(
+                              "```Your final transcription is printed below: \n\n" +
+                                `${res.data.text}` +
+                                "```"
+                            );
+
+                            // Checking if the Content-Safety Detection value is True or false and responding accordingly
+
+                            if ((res.data.content_safety = true)) {
+                              let test =
+                                res.data.content_safety_labels.results[0];
+                              var contentSafetyString = "";
+
+                              // If the content safety detection found no results
+
+                              if (test == undefined) {
+                                msg.reply(
+                                  "No content-safety results to report."
+                                );
+                              }
+
+                              // If the content safety detection feature did find some results
+                              else {
+                                for (let i = 0; i < test.labels.length; i++) {
+                                  console.log("test", test.labels[i].label);
+                                  contentSafetyString +=
+                                    test.labels[i].label + ", ";
+                                }
+                                var finalStr = contentSafetyString.slice(0, -2);
+
+                                msg.reply(
+                                  `Your content-safety results of the audio file are: ${finalStr}`
+                                );
+                              }
+                            }
+                          }
+
                           console.log(res.data.status);
                         });
                     }
                     checkStatus();
                   }
-                  console.log(res.data.id, res.data.status);
                 });
             })
             .catch((err) => {
@@ -107,6 +154,10 @@ client.on("message", async (msg) => {
     }
   }
 });
+
+// error handling response
+// add transcription detail additions for CS T KP
+// respond with further information about transcription details
 
 // // client.on("message", async (msg) => {
 // //   if (!msg.member.voice.channel) {
