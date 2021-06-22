@@ -38,7 +38,6 @@ client.on("message", async (msg) => {
       audio["auto_highlights"] = true;
     }
 
-    console.log(msgSplit);
     for (let i = 0; i < msgSplit.length; i++) {
       if (msgSplit[i].includes(":\\")) {
         let file = msgSplit[i];
@@ -59,10 +58,12 @@ client.on("message", async (msg) => {
               await axios
                 .post("https://api.assemblyai.com/v2/transcript", audio, config)
                 .then((res) => {
-                  console.log(res.data);
+                  // console.log(res.data);
                   if (res.error) {
                     console.log(res.error);
                   } else {
+                    // recursive function to continually check for transcript status
+
                     function checkStatus() {
                       let id = res.data.id;
                       axios
@@ -72,6 +73,14 @@ client.on("message", async (msg) => {
                         )
                         .then((res) => {
                           var status_of_transcipt = res.data.status;
+
+                          // if the transcript has thrown an error
+
+                          if (status_of_transcipt === "error") {
+                            return msg.reply(
+                              `Your audio file gave an error of: ${res.error} `
+                            );
+                          }
 
                           if (
                             status_of_transcipt === "queued" ||
@@ -83,14 +92,6 @@ client.on("message", async (msg) => {
                             setTimeout(() => {
                               checkStatus();
                             }, 5000);
-                          }
-
-                          // once the transcript has thrown an error
-
-                          if (status_of_transcipt === "error") {
-                            return msg.reply(
-                              `Your audio file gave an error of: ${res.error} `
-                            );
                           }
 
                           // if the transcription process has been completed
@@ -110,7 +111,7 @@ client.on("message", async (msg) => {
 
                             // Checking if the Content-Safety Detection value is True or false and responding accordingly
 
-                            if ((res.data.content_safety = true)) {
+                            if (res.data.content_safety == true) {
                               let test =
                                 res.data.content_safety_labels.results[0];
                               var contentSafetyString = "";
@@ -126,22 +127,61 @@ client.on("message", async (msg) => {
                               // If the content safety detection feature did find some results
                               else {
                                 for (let i = 0; i < test.labels.length; i++) {
-                                  console.log("test", test.labels[i].label);
                                   contentSafetyString +=
                                     test.labels[i].label + ", ";
                                 }
                                 var finalStr = contentSafetyString.slice(0, -2);
+
+                                // setting the content_safety feature back to false for future requests
+
+                                audio["content_safety"] = false;
+
+                                // sending the content_safety results back to discord
 
                                 msg.reply(
                                   `Your content-safety results of the audio file are: ${finalStr}`
                                 );
                               }
                             }
-                          }
 
-                          console.log(res.data.status);
+                            //Checking if key phrases (iab_categories) is true
+
+                            if (res.data.iab_categories == true) {
+                              var keyPhraseArr = [];
+
+                              var keyPhraseSummary =
+                                res.data.iab_categories_result.summary;
+                              if (keyPhraseSummary == undefined) {
+                                msg.reply("No key-phrases to report.");
+                              } else
+                                for (const [key, value] of Object.entries(
+                                  keyPhraseSummary
+                                )) {
+                                  if (value > 0.8) {
+                                    let keyPhraseResponse = "";
+                                    keyPhraseResponse += key;
+                                    let tempSplit =
+                                      keyPhraseResponse.split(">");
+                                    keyPhraseArr.push(
+                                      tempSplit[tempSplit.length - 1]
+                                    );
+                                  }
+                                }
+
+                              const keyPhraseResponseFinal = keyPhraseArr
+                                .join()
+                                .replace(/([a-z])([A-Z])/g, "$1 $2")
+                                .replace(/,/g, ", ");
+                              msg.reply(
+                                `Your topics in this audio file are: ${keyPhraseResponseFinal}`
+                              );
+                              audio["iab_categories"] = false;
+                              console.log(audio);
+                            }
+                          }
                         });
                     }
+                    console.log(audio);
                     checkStatus();
                   }
                 });
