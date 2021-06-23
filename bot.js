@@ -108,6 +108,7 @@ client.on("message", async (msg) => {
                                 `${res.data.text}` +
                                 "```"
                             );
+                            // console.log(res.data);
 
                             // Checking if the Content-Safety Detection value is True or false and responding accordingly
 
@@ -122,6 +123,8 @@ client.on("message", async (msg) => {
                                 msg.reply(
                                   "No content-safety results to report."
                                 );
+                                audio["content_safety"] = false;
+                                console.log(audio, 2);
                               }
 
                               // If the content safety detection feature did find some results
@@ -141,47 +144,76 @@ client.on("message", async (msg) => {
                                 msg.reply(
                                   `Your content-safety results of the audio file are: ${finalStr}`
                                 );
+
+                                console.log(audio, 2);
                               }
                             }
 
                             //Checking if key phrases (iab_categories) is true
 
                             if (res.data.iab_categories == true) {
-                              var keyPhraseArr = [];
+                              var topicArr = [];
 
-                              var keyPhraseSummary =
+                              var topicSummary =
                                 res.data.iab_categories_result.summary;
-                              if (keyPhraseSummary == undefined) {
+                              if (topicSummary == undefined) {
                                 msg.reply("No key-phrases to report.");
+                                audio["iab_categories"] = false;
                               } else
                                 for (const [key, value] of Object.entries(
-                                  keyPhraseSummary
+                                  topicSummary
                                 )) {
                                   if (value > 0.8) {
-                                    let keyPhraseResponse = "";
-                                    keyPhraseResponse += key;
-                                    let tempSplit =
-                                      keyPhraseResponse.split(">");
-                                    keyPhraseArr.push(
+                                    let topicResponse = "";
+                                    topicResponse += key;
+                                    let tempSplit = topicResponse.split(">");
+                                    topicArr.push(
                                       tempSplit[tempSplit.length - 1]
                                     );
                                   }
                                 }
 
-                              const keyPhraseResponseFinal = keyPhraseArr
+                              const topicResponseFinal = topicArr
                                 .join()
                                 .replace(/([a-z])([A-Z])/g, "$1 $2")
                                 .replace(/,/g, ", ");
                               msg.reply(
-                                `Your topics in this audio file are: ${keyPhraseResponseFinal}`
+                                `\`\`\`Your topics in this audio file are: ${topicResponseFinal}\`\`\`\``
                               );
                               audio["iab_categories"] = false;
+                              console.log(audio);
+                            }
+
+                            if (res.data.auto_highlights == true) {
+                              var textResponse = "";
+                              var kpResponse =
+                                res.data.auto_highlights_result.results;
+                              if (kpResponse == undefined) {
+                                msg.reply("No key phrases to report");
+                                audio["auto_highlights"] = false;
+                              }
+
+                              for (var i = 0; i < kpResponse.length; i++) {
+                                let rank = kpResponse[i].rank;
+                                if (rank >= 0.07) {
+                                  textResponse += kpResponse[i].text + ", ";
+                                }
+                              }
+                              msg.reply(
+                                `\`\`\`Key Phrases found in the audio file listed below: \n\n${textResponse.slice(
+                                  0,
+                                  -2
+                                )}\`\`\``
+                              );
+
+                              audio["auto_highlights"] = false;
                               console.log(audio);
                             }
                           }
                         });
                     }
-                    console.log(audio);
+
+                    console.log(audio, 1);
                     checkStatus();
                   }
                 });
