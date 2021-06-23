@@ -4,11 +4,21 @@ const fs = require("fs");
 require("dotenv").config();
 const axios = require("axios");
 
-//Here is the API token logins you need to change to run this program. Create your own
-// Discord bot and replace the credentials with your own credentials and it should work
+/*
+Create your own Discord bot and replace the credentials with your own credentials.
+You will also need to give your discord bot the correct permissions. 
+Permissions to check:
+"View channels"
+"Send Messages"
 
+You will also need to get an API token from https://app.assemblyai.com/login/
+*/
+
+/*Change this login token for Discord*/
 client.login(process.env.DISCORD_LOGIN_TOKEN);
+/*Change this token variable here for Assembly AI*/
 var token = process.env.ASSEMBLY_API_TOKEN;
+
 let config = {
   headers: {
     authorization: token,
@@ -58,7 +68,6 @@ client.on("message", async (msg) => {
               await axios
                 .post("https://api.assemblyai.com/v2/transcript", audio, config)
                 .then((res) => {
-                  // console.log(res.data);
                   if (res.error) {
                     console.log(res.error);
                   } else {
@@ -81,6 +90,8 @@ client.on("message", async (msg) => {
                               `Your audio file gave an error of: ${res.error} `
                             );
                           }
+
+                          //checking if the transcript is still processing and notifying discord
 
                           if (
                             status_of_transcipt === "queued" ||
@@ -108,9 +119,8 @@ client.on("message", async (msg) => {
                                 `${res.data.text}` +
                                 "```"
                             );
-                            // console.log(res.data);
 
-                            // Checking if the Content-Safety Detection value is True or false and responding accordingly
+                            // Checking if the Content-Safety Detection value is True and responding accordingly
 
                             if (res.data.content_safety == true) {
                               let test =
@@ -121,10 +131,9 @@ client.on("message", async (msg) => {
 
                               if (test == undefined) {
                                 msg.reply(
-                                  "No content-safety results to report."
+                                  "```CS: No content-safety results to report.```"
                                 );
                                 audio["content_safety"] = false;
-                                console.log(audio, 2);
                               }
 
                               // If the content safety detection feature did find some results
@@ -142,10 +151,8 @@ client.on("message", async (msg) => {
                                 // sending the content_safety results back to discord
 
                                 msg.reply(
-                                  `Your content-safety results of the audio file are: ${finalStr}`
+                                  `\`\`\`CS: Your content-safety results of the audio file are: ${finalStr}\`\`\`\``
                                 );
-
-                                console.log(audio, 2);
                               }
                             }
 
@@ -153,13 +160,19 @@ client.on("message", async (msg) => {
 
                             if (res.data.iab_categories == true) {
                               var topicArr = [];
-
                               var topicSummary =
                                 res.data.iab_categories_result.summary;
+
+                              // If the API sent back an empty summary list.
+
                               if (topicSummary == undefined) {
-                                msg.reply("No key-phrases to report.");
+                                msg.reply("```T: No topics to report.```");
                                 audio["iab_categories"] = false;
-                              } else
+                              }
+
+                              // If the API sent back a summary
+                              /*If the value or "weight" of the summary entry is above 80%, we return it to discord*/
+                              else
                                 for (const [key, value] of Object.entries(
                                   topicSummary
                                 )) {
@@ -173,25 +186,34 @@ client.on("message", async (msg) => {
                                   }
                                 }
 
+                              // Constructing a correct String variable by adding spaces between words and after commas.
+
                               const topicResponseFinal = topicArr
                                 .join()
                                 .replace(/([a-z])([A-Z])/g, "$1 $2")
                                 .replace(/,/g, ", ");
                               msg.reply(
-                                `\`\`\`Your topics in this audio file are: ${topicResponseFinal}\`\`\`\``
+                                `\`\`\`T: Your topics in this audio file are: ${topicResponseFinal}\`\`\`\``
                               );
                               audio["iab_categories"] = false;
-                              console.log(audio);
                             }
+
+                            // Checking if auto_highlights is true
 
                             if (res.data.auto_highlights == true) {
                               var textResponse = "";
                               var kpResponse =
                                 res.data.auto_highlights_result.results;
+
+                              // Response if Auto_highlights is undefined or returns an emtpy object.
+
                               if (kpResponse == undefined) {
-                                msg.reply("No key phrases to report");
+                                msg.reply("```KP: No key phrases to report```");
                                 audio["auto_highlights"] = false;
                               }
+
+                              // If the API returns an auto_highlight response. We loop through and message back to discord
+                              // the Key Phrases that are ranked above or equal to 7%
 
                               for (var i = 0; i < kpResponse.length; i++) {
                                 let rank = kpResponse[i].rank;
@@ -200,20 +222,18 @@ client.on("message", async (msg) => {
                                 }
                               }
                               msg.reply(
-                                `\`\`\`Key Phrases found in the audio file listed below: \n\n${textResponse.slice(
+                                `\`\`\`KP: Key Phrases found in the audio file listed below: \n\n${textResponse.slice(
                                   0,
                                   -2
                                 )}\`\`\``
                               );
 
                               audio["auto_highlights"] = false;
-                              console.log(audio);
                             }
                           }
                         });
                     }
 
-                    console.log(audio, 1);
                     checkStatus();
                   }
                 });
