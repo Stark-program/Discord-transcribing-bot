@@ -10,14 +10,9 @@
   "license": "ISC",
   "dependencies": {
     "@discordjs/opus": "^0.5.3",
-    "audio-decode": "^1.4.0",
     "axios": "^0.21.1",
     "discord.js": "^12.5.3",
     "dotenv": "^10.0.0",
-    "fs": "0.0.1-security",
-    "jsdom": "^16.6.0",
-    "rebuild": "^0.1.2",
-    "unirest": "^0.6.0",
-    "yt-player": "^3.5.0"
+    "fs": "0.0.1-security"
   }
 }
