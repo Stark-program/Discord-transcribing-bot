@@ -19,13 +19,15 @@ client.login(process.env.DISCORD_LOGIN_TOKEN);
 /*Change this token variable here for Assembly AI*/
 var token = process.env.ASSEMBLY_API_TOKEN;
 
-let config = {
+const AUTO_HIGHLIGHT_RANK_THRESHOLD = 0.07;
+const TOPIC_RANK_THRESHOLD = 0.8;
+
+const config = {
   headers: {
     authorization: token,
     "Content-Type": "application/json",
   },
 };
-let audio = {};
 
 client.on("ready", () => {
   console.log(`Logged in as ${client.user.tag}!`);
@@ -33,9 +35,10 @@ client.on("ready", () => {
 
 client.on("message", async (msg) => {
   if (msg.content === "!!tt help") {
-    msg.reply("``````");
+    msg.reply("```Add these commands for additional transcription details:\n\n-CS: Content-Safety-flag profanity, hate speech, and other sensitive content in an audio/video file\n-T: Topic Detection to detect the topics in an audio/video file, based on the transcription\n-KP: Key-Phrases that will surface key words/phrases in the transcription text\n\nExample:\n\n!!tt -CS C:/path/to/file (This will use the content safety feature on the audio file)\n\nExample #2:\n\n!!tt -CS -KP -T C:/path/to/file (this will use the content-safety, key-phrases, and topic detection features on the transcription)\n\n\nRules to follow when transcribing a file:\n\n1.Have no spaces in your file path\n2.Remove quotation marks from your file path```");
   }
   if (msg.content.includes("!!tt")) {
+    let audio = {};
     var msgSplit = msg.content.split(" ");
 
     if (msg.content.includes("CS")) {
@@ -47,13 +50,19 @@ client.on("message", async (msg) => {
     if (msg.content.includes("KP")) {
       audio["auto_highlights"] = true;
     }
+    
 
     for (let i = 0; i < msgSplit.length; i++) {
       if (msgSplit[i].includes(":\\")) {
         let file = msgSplit[i];
 
         fs.readFile(file, (err, data) => {
-          if (err) return console.log(err);
+          if (err) {
+            if (err.errno == -4058) {
+              msg.reply("Error -4058: Make sure your file path has no spaces, or quotation marks, otherwise the transcription will not work.")
+              
+            }
+          };
 
           axios
             .post(`https://api.assemblyai.com/v2/upload`, data, {
@@ -68,12 +77,12 @@ client.on("message", async (msg) => {
               await axios
                 .post("https://api.assemblyai.com/v2/transcript", audio, config)
                 .then((res) => {
-                  if (res.error) {
-                    console.log(res.error);
+                  if (res.data.error) {
+                    console.log(res.data.error);
                   } else {
                     // recursive function to continually check for transcript status
 
-                    function checkStatus() {
+                    function checkStatus(currentStatus) {
                       let id = res.data.id;
                       axios
                         .get(
@@ -86,8 +95,9 @@ client.on("message", async (msg) => {
                           // if the transcript has thrown an error
 
                           if (status_of_transcipt === "error") {
+                            
                             return msg.reply(
-                              `Your audio file gave an error of: ${res.error} `
+                              `\`\`\`Your audio file gave an error of: ${res.data.error}\`\`\``
                             );
                           }
 
@@ -97,11 +107,14 @@ client.on("message", async (msg) => {
                             status_of_transcipt === "queued" ||
                             status_of_transcipt === "processing"
                           ) {
-                            msg.reply(
-                              `Your audio file is ${status_of_transcipt}`
-                            );
+                            if (currentStatus != status_of_transcipt) {
+                              msg.reply(
+                                `Your audio file is ${status_of_transcipt}`
+                              );
+                            }
+
                             setTimeout(() => {
-                              checkStatus();
+                              checkStatus(status_of_transcipt);
                             }, 5000);
                           }
 
@@ -123,30 +136,32 @@ client.on("message", async (msg) => {
                             // Checking if the Content-Safety Detection value is True and responding accordingly
 
                             if (res.data.content_safety == true) {
-                              let test =
+                              let content_safety_response =
                                 res.data.content_safety_labels.results[0];
                               var contentSafetyString = "";
 
                               // If the content safety detection found no results
 
-                              if (test == undefined) {
+                              if (content_safety_response == undefined) {
                                 msg.reply(
                                   "```CS: No content-safety results to report.```"
                                 );
-                                audio["content_safety"] = false;
                               }
 
                               // If the content safety detection feature did find some results
                               else {
-                                for (let i = 0; i < test.labels.length; i++) {
+                                for (
+                                  let i = 0;
+                                  i < content_safety_response.labels.length;
+                                  i++
+                                ) {
                                   contentSafetyString +=
-                                    test.labels[i].label + ", ";
+                                    content_safety_response.labels[i].label +
+                                    ", ";
                                 }
                                 var finalStr = contentSafetyString.slice(0, -2);
 
                                 // setting the content_safety feature back to false for future requests
-
-                                audio["content_safety"] = false;
 
                                 // sending the content_safety results back to discord
 
@@ -167,7 +182,6 @@ client.on("message", async (msg) => {
 
                               if (topicSummary == undefined) {
                                 msg.reply("```T: No topics to report.```");
-                                audio["iab_categories"] = false;
                               }
 
                               // If the API sent back a summary
@@ -176,7 +190,7 @@ client.on("message", async (msg) => {
                                 for (const [key, value] of Object.entries(
                                   topicSummary
                                 )) {
-                                  if (value > 0.8) {
+                                  if (value > TOPIC_RANK_THRESHOLD) {
                                     let topicResponse = "";
                                     topicResponse += key;
                                     let tempSplit = topicResponse.split(">");
@@ -195,7 +209,6 @@ client.on("message", async (msg) => {
                               msg.reply(
                                 `\`\`\`T: Your topics in this audio file are: ${topicResponseFinal}\`\`\`\``
                               );
-                              audio["iab_categories"] = false;
                             }
 
                             // Checking if auto_highlights is true
@@ -209,7 +222,6 @@ client.on("message", async (msg) => {
 
                               if (kpResponse == undefined) {
                                 msg.reply("```KP: No key phrases to report```");
-                                audio["auto_highlights"] = false;
                               }
 
                               // If the API returns an auto_highlight response. We loop through and message back to discord
@@ -217,7 +229,7 @@ client.on("message", async (msg) => {
 
                               for (var i = 0; i < kpResponse.length; i++) {
                                 let rank = kpResponse[i].rank;
-                                if (rank >= 0.07) {
+                                if (rank >= AUTO_HIGHLIGHT_RANK_THRESHOLD) {
                                   textResponse += kpResponse[i].text + ", ";
                                 }
                               }
@@ -227,14 +239,13 @@ client.on("message", async (msg) => {
                                   -2
                                 )}\`\`\``
                               );
-
-                              audio["auto_highlights"] = false;
                             }
                           }
                         });
                     }
 
                     checkStatus();
+                    
                   }
                 });
             })
@@ -246,23 +257,3 @@ client.on("message", async (msg) => {
     }
   }
 });
-
-// error handling response
-// add transcription detail additions for CS T KP
-// respond with further information about transcription details
-
-// // client.on("message", async (msg) => {
-// //   if (!msg.member.voice.channel) {
-// //     console.log("Not in a voice channel!");
-// //   }
-// //   if (msg.content === "!!tt cs" ) {
-// //     const connection = await msg.member.voice.channel.join();
-
-// //     const audio = connection.receiver.createStream(msg, {
-// //       mode: "pcm",
-// //       end: "manual",
-// //     });
-
-// //     audio.pipe(fs.createWriteStream(`${msg.member.user.username}_audio`));
-// //   }
-// // });
