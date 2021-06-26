@@ -41,13 +41,13 @@ client.on("message", async (msg) => {
     let audio = {};
     var msgSplit = msg.content.split(" ");
 
-    if (msg.content.includes("CS")) {
+    if (msg.content.includes("-CS")) {
       audio["content_safety"] = true;
     }
-    if (msg.content.includes("T")) {
+    if (msg.content.includes("-T")) {
       audio["iab_categories"] = true;
     }
-    if (msg.content.includes("KP")) {
+    if (msg.content.includes("-KP")) {
       audio["auto_highlights"] = true;
     }
     
