@@ -35,11 +35,15 @@ client.on("ready", () => {
 
 client.on("message", async (msg) => {
   if (msg.content === "!!tt help") {
-    msg.reply("```Add these commands for additional transcription details:\n\n-CS: Content-Safety-flag profanity, hate speech, and other sensitive content in an audio/video file\n-T: Topic Detection to detect the topics in an audio/video file, based on the transcription\n-KP: Key-Phrases that will surface key words/phrases in the transcription text\n\nExample:\n\n!!tt -CS C:/path/to/file (This will use the content safety feature on the audio file)\n\nExample #2:\n\n!!tt -CS -KP -T C:/path/to/file (this will use the content-safety, key-phrases, and topic detection features on the transcription)\n\n\nRules to follow when transcribing a file:\n\n1.Have no spaces in your file path\n2.Remove quotation marks from your file path```");
+    msg.reply(
+      "```Add these commands for additional transcription details:\n\n-CS: Content-Safety-flag profanity, hate speech, and other sensitive content in an audio/video file\n-T: Topic Detection to detect the topics in an audio/video file, based on the transcription\n-KP: Key-Phrases that will surface key words/phrases in the transcription text\n\nExample:\n\n!!tt -CS C:/path/to/file (This will use the content safety feature on the audio file)\n\nExample #2:\n\n!!tt -CS -KP -T C:/path/to/file (this will use the content-safety, key-phrases, and topic detection features on the transcription)\n\n\nRules to follow when transcribing a file:\n\n1.Have no spaces in your file path\n2.Remove quotation marks from your file path```"
+    );
   }
   if (msg.content.includes("!!tt")) {
     let audio = {};
     var msgSplit = msg.content.split(" ");
+    var file_split = msgSplit[msgSplit.length - 1].split("\\");
+    var file_name = file_split[file_split.length - 1];
 
     if (msg.content.includes("-CS")) {
       audio["content_safety"] = true;
@@ -50,7 +54,6 @@ client.on("message", async (msg) => {
     if (msg.content.includes("-KP")) {
       audio["auto_highlights"] = true;
     }
-    
 
     for (let i = 0; i < msgSplit.length; i++) {
       if (msgSplit[i].includes(":\\")) {
@@ -59,10 +62,11 @@ client.on("message", async (msg) => {
         fs.readFile(file, (err, data) => {
           if (err) {
             if (err.errno == -4058) {
-              msg.reply("Error -4058: Make sure your file path has no spaces, or quotation marks, otherwise the transcription will not work.")
-              
+              msg.reply(
+                "Error -4058: Make sure your file path has no spaces, or quotation marks, otherwise the transcription will not work."
+              );
             }
-          };
+          }
 
           axios
             .post(`https://api.assemblyai.com/v2/upload`, data, {
@@ -95,7 +99,6 @@ client.on("message", async (msg) => {
                           // if the transcript has thrown an error
 
                           if (status_of_transcipt === "error") {
-                            
                             return msg.reply(
                               `\`\`\`Your audio file gave an error of: ${res.data.error}\`\`\``
                             );
@@ -124,14 +127,28 @@ client.on("message", async (msg) => {
                             msg.reply(
                               `Your audio file is ${status_of_transcipt}`
                             );
+                            let text_response = res.data.text;
+                            let textLength = text_response.length;
+                            if (textLength >= 2001) {
+                              msg.reply(
+                                `Your audio file exceeded the discord limit of 4000 characters and therefore was exported as a text file as: ${file_name}.txt`
+                              );
+                              fs.writeFile(
+                                `${file_name}.txt`,
+                                text_response,
+                                (err) => {
+                                  if (err) throw err;
+                                }
+                              );
+                            } else if (textLength <= 2000) {
+                              msg.reply(
+                                "```Your final transcription is printed below: \n\n" +
+                                  `${res.data.text}` +
+                                  "```"
+                              );
+                            }
 
                             // Responding to discord the transcription text of the audio file
-
-                            msg.reply(
-                              "```Your final transcription is printed below: \n\n" +
-                                `${res.data.text}` +
-                                "```"
-                            );
 
                             // Checking if the Content-Safety Detection value is True and responding accordingly
 
@@ -245,7 +262,6 @@ client.on("message", async (msg) => {
                     }
 
                     checkStatus();
-                    
                   }
                 });
             })
